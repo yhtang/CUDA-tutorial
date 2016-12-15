@@ -1,0 +1,138 @@
+/*
+ * bmp.h
+ *
+ *  Created on: Apr 29, 2014
+ *      Author: ytang
+ */
+
+#ifndef BMP_H_
+#define BMP_H_
+
+#include <iostream>
+#include <fstream>
+#include <cstdlib>
+
+#if sizeof(int) == 2
+typedef int WORD;
+#else
+typedef short int WORD;
+#endif
+
+#if sizeof(int) == 4
+typedef int DWORD;
+#else
+typedef long DWORD;
+#endif
+
+struct bitmap
+{
+	char *pixel;
+	int width, height;
+
+	bitmap() {
+		pixel = NULL;
+		width = height = 0;
+	}
+	~bitmap() {
+		if (pixel) delete [] pixel;
+	}
+};
+
+typedef struct tag_bitmapFILEHEADER
+{
+    WORD     bfType;
+    DWORD    bfSize;
+    WORD     bfReserved1;
+    WORD     bfReserved2;
+    DWORD    bfOffBits;
+
+} _bitmapFILEHEADER;
+
+typedef struct tag_bitmapINFOHEADER
+{
+	DWORD    biSize;
+	DWORD    biWidth;
+	DWORD    biHeight;
+	WORD     biPlanes;
+	WORD     biBitCount;
+    DWORD    biCompression;
+    DWORD    biSizeImage;
+    DWORD    biXPelsPerMeter;
+    DWORD    biYPelsPerMeter;
+    DWORD    biClrUsed;
+    DWORD    biClrImportant;
+} _bitmapINFOHEADER;
+
+bitmap * LoadBMP(char *fn)
+{
+	bitmap * image;
+	_bitmapFILEHEADER	FileHeader;
+	_bitmapINFOHEADER	bmiHeader;
+	int		width, height, linebytes;
+
+	image = new bitmap;
+	if (image==NULL) return NULL;
+	std::ifstream fp(fn);
+	if (fp.fail()) { delete image; return NULL; }
+
+	if (fread((char *)&FileHeader, sizeof(FileHeader), 1, fp) != 1)
+	{
+		farfree(image);
+		fclose(fp);
+		return NULL;
+	}
+
+    	if (FileHeader.bfType != 0X4D42)
+	{
+		farfree(image);
+		fclose(fp);
+		return NULL;
+	}
+
+	if (fread((char *)&bmiHeader, sizeof(bmiHeader), 1, fp) != 1)
+	{
+		farfree(image);
+		fclose(fp);
+		return NULL;
+	}
+
+	if (bmiHeader.biBitCount > 8)
+	{
+		farfree(image);
+		fclose(fp);
+		return NULL;
+	}
+
+	if (bmiHeader.biCompression != 0)
+	{
+		farfree(image);
+		fclose(fp);
+		return NULL;
+	}
+
+	image->width = width = (unsigned int)bmiHeader.biWidth;
+	image->height = height = (unsigned int)bmiHeader.biHeight;
+	linebytes = ((width*(long)bmiHeader.biBitCount+31)>>5)<<2;
+	if ( ( image->pixel = (char *)malloc(linebytes*height) ) ==NULL )
+	{
+		farfree(image);
+		fclose(fp);
+		return NULL;
+	}
+	fseek(fp,FileHeader.bfOffBits,SEEK_SET);
+	for(i=0;i<height;i++)
+	{
+		if ( fread(image->pixel+linebytes*(height-i-1),linebytes,1,fp)!=1)
+		{
+			farfree(image->pixel);
+			farfree(image);
+			fclose(fp);
+			return NULL;
+		}
+	}
+	fclose(fp);
+	return image;
+}
+
+
+#endif /* BMP_H_ */
